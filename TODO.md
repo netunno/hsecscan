@@ -12,3 +12,4 @@
 # Done
 
 * Check missing headers by HTTPS or HTTP
+* Export hsecscan results to JSON format
