@@ -12,13 +12,25 @@ import ssl
 class RedirectHandler(urllib2.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         newreq = urllib2.HTTPRedirectHandler.redirect_request(self, req, fp, code, msg, headers, newurl)
-        print '>> REDIRECT INFO <<'
+        asp = '"%s"'
+        #print '>> REDIRECT INFO <<'
+        print '{'
+        print asp % 'REDIRECT INFO'
+        #print_response(req.get_full_url(), code, headers)
+        print '['
         print_response(req.get_full_url(), code, headers)
-        print '>> REDIRECT HEADERS DETAILS <<'
+        print ']'
+        #print '>> REDIRECT HEADERS DETAILS <<'
+        print '['
+        print asp % 'REDIRECT HEADERS DETAILS'
         for header in headers.items():
             check_header(header)
-        print '>> REDIRECT MISSING HEADERS <<'
+        print ']'
+        #print '>> REDIRECT MISSING HEADERS <<'
+        print asp % 'REDIRECT MISSING HEADERS'
+        print '['
         missing_headers(headers.items(), urlparse(newurl).scheme)
+        print ']'
         return newreq
 
 def print_database(headers):
@@ -26,13 +38,28 @@ def print_database(headers):
     cur = conn.cursor()
     cur.execute('SELECT * FROM headers')
     col_names = [cn[0] for cn in cur.description]
+    first = True
+    first_item = True
+    print '['
     for row in cur:
         col_index = 0
+        first = True
         if (headers == False) | (row[6] == 'Y'):
             for cel in row:
-                print col_names[col_index] + ':', cel
+                if first_item and first:
+                    first_item = False
+                    first = False
+                    print '{'
+                elif first:
+                    first = False
+                    print ',{'
+                else:
+                     print ',',
+                print print_formated(col_names[col_index], cel)
                 col_index += 1
-            print '\n'
+            #print '\n'
+            print '}'
+    print ']'
     cur.close()
     conn.close()
 
@@ -41,26 +68,70 @@ def print_header(header):
     cur = conn.cursor()
     cur.execute('SELECT "Header Field Name", "Reference", "Security Description", "Security Reference", "Recommendations", "CWE", "CWE URL" FROM headers WHERE "Header Field Name" = ? COLLATE NOCASE', [header])
     col_names = [cn[0] for cn in cur.description]
+    first = True
     for row in cur:
         col_index = 0
+        print '{'
         for cel in row:
-            print col_names[col_index] + ':', cel
+            #print col_names[col_index] + ':', cel
+            if first:
+                first = False
+            else:
+                print ','
+            print print_formated(col_names[col_index], cel)
             col_index += 1
+        print '}'
     cur.close()
     conn.close()
 
+#def print_response(url, code, headers):
+#    print 'URL:', url
+#    print 'Code:', code
+#    print 'Headers:'
+#    for line in str(headers).splitlines():
+#        print '', line
+#    print ''
+
 def print_response(url, code, headers):
-    print 'URL:', url
-    print 'Code:', code
-    print 'Headers:'
-    for line in str(headers).splitlines():
-        print '', line
-    print ''
+    asp = '"%s"'
+    print print_formated('URL',url),','
+    #print asp % 'URL', ':', asp % url
+    #print asp % 'Code', ':', asp % code
+    print print_formated('Code',code),','
+    print print_formated_obj('Headers')
+    #print type(headers)
+    #print headers.getplist()
+    #json.dumps(headers)
+
+    #print json.dumps(headers.info().__dict__, indent=4)
+    print json.dumps(headers.__dict__["headers"], indent=4)
+    #for line in str(headers).splitlines():
+    #    print asp % line
+    #print ''
+    
+
+def print_formated(chave,valor):
+    if valor == 'Y':
+        return '"%s":true' %(chave)
+    elif valor in ['N','','-','\r']:
+        return '"%s":false' %chave
+    elif is_number(valor):
+        return '"%s":%s' %(chave,valor) 
+    return '"%s":"%s"' %(chave,valor.replace('\"','\''))
+
+def is_number(valor):
+    if isinstance(valor,float) or isinstance(valor,int):
+        return True
+
+def print_formated_obj(chave):
+    return '"%s":' %(chave)
 
 def check_header(header):
     conn = sqlite3.connect(dbfile)
     cur = conn.cursor()
     t = (header[0],)
+    first = True
+    first_item = True
     if allheaders:
         cur.execute('SELECT "Header Field Name", "Reference", "Security Description", "Security Reference", "Recommendations", "CWE", "CWE URL" FROM headers WHERE "Header Field Name" = ? COLLATE NOCASE', t)
     else:
@@ -68,13 +139,17 @@ def check_header(header):
     col_names = [cn[0] for cn in cur.description]
     for row in cur:
         col_index = 0
+        first = True
         for cel in row:
-            if col_names[col_index] == 'Header Field Name':
-                print col_names[col_index] + ':', cel, '\nValue: ' + header[1]
+            if first:
+                first = False
             else:
-                print col_names[col_index] + ':', cel
+                print ',',
+            print print_formated(col_names[col_index], cel)
+            if col_names[col_index] == 'Header Field Name':
+                print ',', print_formated('Value',header[1])
             col_index += 1
-        print ''
+        #print ''
     cur.close()
     conn.close()
 
@@ -82,15 +157,30 @@ def missing_headers(headers, scheme):
     conn = sqlite3.connect(dbfile)
     cur = conn.cursor()
     cur.execute('SELECT "Header Field Name", "Reference", "Security Description", "Security Reference", "Recommendations", "CWE", "CWE URL", "HTTPS" FROM headers WHERE "Required" = "Y"')
+    first_item = True
     col_names = [cn[0] for cn in cur.description]
     header_names = [name[0] for name in headers]
+    print '['
     for row in cur:
+        first = True
         if (row[0].lower() not in (name.lower() for name in header_names)) & ((scheme == 'https') | (row[7] != 'Y')):
             col_index = 0
+            if first_item:
+                first_item = False
+            else:
+                print ',',
+            print '{'
             for cel in row:
-                print col_names[col_index] + ':', cel
+                if first:
+                    first = False
+                else:
+                    print ',',
+                #print col_names[col_index] + ':', cel
+                print print_formated(col_names[col_index], cel)
                 col_index += 1
-            print ''
+            #print ''
+            print '}'
+    print ']'
     cur.close()
     conn.close()
 
@@ -98,6 +188,8 @@ def scan(url, redirect, insecure, useragent, postdata, proxy):
     request = urllib2.Request(url.geturl())
     request.add_header('User-Agent', useragent)
     request.add_header('Origin', 'http://hsecscan.com')
+    asp = '"%s"'
+    first = True
     if postdata:
         request.add_data(urllib.urlencode(postdata))
     build = [urllib2.HTTPHandler()]
@@ -110,13 +202,37 @@ def scan(url, redirect, insecure, useragent, postdata, proxy):
         build.append(urllib2.HTTPSHandler(context=context))
     urllib2.install_opener(urllib2.build_opener(*build))
     response = urllib2.urlopen(request)
-    print '>> RESPONSE INFO <<'
+
+    print '{'   
+    print print_formated_obj('RESPONSE INFO')
+    print '{'
+    #print json.dumps(response.info().__dict__, indent=4)
+    #print 'response.info().getplist()'
+    #print response.info().getplist()
+    #print 'print_response_json(response.geturl(), response.getcode(), response.info().getplist())'
+    #print_response_json(response.geturl(), response.getcode(), response.info().getplist())
+    #print_response_json(response.geturl(), response.getcode(), json.dumps(response.info().__dict__, indent=4))
     print_response(response.geturl(), response.getcode(), response.info())
-    print '>> RESPONSE HEADERS DETAILS <<'
+
+    #print json.dumps(response.info().__dict__, indent=4)
+    print '},'
+    #print '{'   
+    print print_formated_obj('RESPONSE HEADERS DETAILS')
+    print '['   
     for header in response.info().items():
+        if first:
+            first = False
+        else:
+            print ',',
+        print '{'
         check_header(header)
-    print '>> RESPONSE MISSING HEADERS <<'
+        print '}'
+    print '],'
+    #print '},'
+    #print '{'   
+    print print_formated_obj('RESPONSE MISSING HEADERS')
     missing_headers(response.info().items(), url.scheme)
+    print '}'
 
 def check_url(url):
     url_checked = urlparse(url)
